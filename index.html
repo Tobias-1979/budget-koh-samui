@@ -227,6 +227,8 @@ select {
 }
 
 .empty-hint { text-align: center; color: var(--ink-muted); font-size: 0.85rem; padding: 20px 0; }
+.backup-actions { display: flex; gap: 10px; }
+.backup-actions .btn { flex: 1; }
 </style>
 </head>
 <body>
@@ -290,6 +292,15 @@ select {
           <table class="hist-table" id="histTable"></table>
         </div>
       </div>
+      <div class="card">
+        <h2 id="lbl_backup">DATEN / BACKUP</h2>
+        <p class="empty-hint" id="backup_hint" style="padding:0 0 12px; text-align:left;"></p>
+        <div class="backup-actions">
+          <button class="btn btn-ghost" id="btnExport"></button>
+          <button class="btn btn-ghost" id="btnImport"></button>
+        </div>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+      </div>
     </section>
   </main>
 
@@ -351,12 +362,18 @@ select {
       tax: "Steuersatz (%)", apply: "Übernehmen", netThb: "Nettoeinkommen", totalExp: "Summe Ausgaben",
       result: "ERGEBNIS", reserveThb: "Rücklage (Baht)", reserveEur: "Rücklage (EUR)", ratio: "Ausgabenquote vom Netto",
       expenses: "AUSGABEN", history: "VERLAUF", addExpense: "Ausgabe hinzufügen", editExpense: "Ausgabe bearbeiten",
-      name: "Bezeichnung", amount: "Betrag", currency: "Währung", save: "Speichern", delete: "Löschen",
+      name: "Bezeichnung", nameDeLabel: "Bezeichnung (Deutsch)", nameThLabel: "Bezeichnung (Thai)", amount: "Betrag", currency: "Währung", save: "Speichern", delete: "Löschen",
       cancel: "Abbrechen", newMonth: "Neuer Monat", newMonthPrompt: "Name des neuen Monats", create: "Anlegen",
       histMonth: "Monat", histNet: "Netto (THB)", histExp: "Ausgaben (THB)", histResThb: "Rücklage (THB)", histResEur: "Rücklage (EUR)",
       emptyExpenses: "Noch keine Ausgaben – tippe auf + zum Hinzufügen.", nameRequired: "Bitte eine Bezeichnung eingeben.",
       invalidNumber: "Bitte eine gültige Zahl eingeben.", monthExists: "Dieser Monat existiert bereits.",
-      addMonth: "+ Monat"
+      addMonth: "+ Monat",
+      backup: "DATEN / BACKUP",
+      backupHint: "Sichere alle Monate und Ausgaben als Datei – oder stelle sie aus einer Sicherung wieder her.",
+      exportData: "Exportieren", importData: "Importieren",
+      importConfirm: "Aktuelle Daten durch die Sicherung ersetzen? Das kann nicht rückgängig gemacht werden.",
+      importError: "Datei konnte nicht gelesen werden (ungültiges Format).",
+      importDone: "Sicherung erfolgreich importiert."
     },
     th: {
       appTitle: "งบประมาณ เกาะสมุย", tabOverview: "ภาพรวม", tabExpenses: "รายจ่าย", tabHistory: "ประวัติ",
@@ -364,12 +381,18 @@ select {
       tax: "อัตราภาษี (%)", apply: "บันทึก", netThb: "รายได้สุทธิ", totalExp: "รวมรายจ่าย",
       result: "ผลลัพธ์", reserveThb: "เงินคงเหลือ/เงินออม (บาท)", reserveEur: "เงินคงเหลือ/เงินออม (ยูโร)", ratio: "สัดส่วนรายจ่ายต่อรายได้สุทธิ",
       expenses: "รายจ่าย", history: "ประวัติ", addExpense: "เพิ่มรายจ่าย", editExpense: "แก้ไขรายจ่าย",
-      name: "รายการ", amount: "จำนวนเงิน", currency: "สกุลเงิน", save: "บันทึก", delete: "ลบ",
+      name: "รายการ", nameDeLabel: "รายการ (เยอรมัน)", nameThLabel: "รายการ (ไทย)", amount: "จำนวนเงิน", currency: "สกุลเงิน", save: "บันทึก", delete: "ลบ",
       cancel: "ยกเลิก", newMonth: "เดือนใหม่", newMonthPrompt: "ชื่อเดือนใหม่", create: "สร้าง",
       histMonth: "เดือน", histNet: "รายได้สุทธิ (บาท)", histExp: "รายจ่าย (บาท)", histResThb: "เงินออม (บาท)", histResEur: "เงินออม (ยูโร)",
       emptyExpenses: "ยังไม่มีรายจ่าย – แตะ + เพื่อเพิ่ม", nameRequired: "กรุณาใส่ชื่อรายการ",
       invalidNumber: "กรุณาใส่ตัวเลขที่ถูกต้อง", monthExists: "มีเดือนนี้อยู่แล้ว",
-      addMonth: "+ เดือน"
+      addMonth: "+ เดือน",
+      backup: "ข้อมูล / สำรองข้อมูล",
+      backupHint: "สำรองทุกเดือนและรายจ่ายเป็นไฟล์ หรือกู้คืนจากไฟล์สำรอง",
+      exportData: "ส่งออก", importData: "นำเข้า",
+      importConfirm: "แทนที่ข้อมูลปัจจุบันด้วยไฟล์สำรองหรือไม่? ไม่สามารถย้อนกลับได้",
+      importError: "อ่านไฟล์ไม่สำเร็จ (รูปแบบไม่ถูกต้อง)",
+      importDone: "นำเข้าข้อมูลสำรองสำเร็จ"
     }
   };
 
@@ -444,6 +467,10 @@ select {
     document.getElementById("btnApply").textContent = t("apply");
     document.getElementById("lbl_expenses").textContent = t("expenses");
     document.getElementById("lbl_history").textContent = t("history");
+    document.getElementById("lbl_backup").textContent = t("backup");
+    document.getElementById("backup_hint").textContent = t("backupHint");
+    document.getElementById("btnExport").textContent = t("exportData");
+    document.getElementById("btnImport").textContent = t("importData");
     document.getElementById("tabbtn_overview").textContent = t("tabOverview");
     document.getElementById("tabbtn_expenses").textContent = t("tabExpenses");
     document.getElementById("tabbtn_history").textContent = t("tabHistory");
@@ -567,6 +594,55 @@ select {
 
   document.getElementById("btnAddExpense").addEventListener("click", function () { openExpenseSheet(null); });
 
+  // ---------------------------------------------------------------- backup
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+  function exportData() {
+    var payload = { app: "BudgetKohSamui", version: 1, exportedAt: new Date().toISOString(), data: state };
+    var json = JSON.stringify(payload, null, 2);
+    var blob = new Blob([json], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var now = new Date();
+    var fname = "budget-koh-samui-" + now.getFullYear() + "-" + pad2(now.getMonth() + 1) + "-" + pad2(now.getDate()) + ".json";
+    var a = document.createElement("a");
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function applyImported(obj) {
+    // Sowohl das umhuellte Export-Format als auch einen rohen State akzeptieren
+    var d = obj && obj.data && obj.data.months ? obj.data : obj;
+    if (!d || typeof d !== "object" || !d.months || typeof d.months !== "object" || !Object.keys(d.months).length) {
+      return false;
+    }
+    var clean = { language: (d.language === "th" ? "th" : "de"), currentMonth: d.currentMonth, months: d.months };
+    if (!clean.months[clean.currentMonth]) clean.currentMonth = Object.keys(d.months)[0];
+    state = clean;
+    save(state);
+    return true;
+  }
+
+  document.getElementById("btnExport").addEventListener("click", exportData);
+
+  var importFile = document.getElementById("importFile");
+  document.getElementById("btnImport").addEventListener("click", function () { importFile.value = ""; importFile.click(); });
+  importFile.addEventListener("change", function () {
+    var file = importFile.files && importFile.files[0];
+    if (!file) return;
+    if (!window.confirm(t("importConfirm"))) { importFile.value = ""; return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var obj = JSON.parse(String(reader.result));
+        if (applyImported(obj)) { renderAll(); alert(t("importDone")); }
+        else { alert(t("importError")); }
+      } catch (e) { alert(t("importError")); }
+      importFile.value = "";
+    };
+    reader.onerror = function () { alert(t("importError")); importFile.value = ""; };
+    reader.readAsText(file);
+  });
+
   // ---------------------------------------------------------------- sheets
   var overlay = document.getElementById("sheetOverlay");
   var sheetContent = document.getElementById("sheetContent");
@@ -581,7 +657,8 @@ select {
     sheetContent.innerHTML =
       '<div class="sheet-handle"></div>' +
       '<h3>' + (editing ? t("editExpense") : t("addExpense")) + '</h3>' +
-      '<div class="field"><label>' + t("name") + '</label><input type="text" id="sh_name" value="' + escapeHtml(itemNameOrRaw(item)) + '"></div>' +
+      '<div class="field"><label>' + t("nameDeLabel") + '</label><input type="text" id="sh_name_de" value="' + escapeHtml(item.nameDe || "") + '"></div>' +
+      '<div class="field"><label>' + t("nameThLabel") + '</label><input type="text" id="sh_name_th" value="' + escapeHtml(item.nameTh || "") + '"></div>' +
       '<div class="field"><label>' + t("amount") + '</label><input type="number" inputmode="decimal" step="0.01" id="sh_amount" value="' + (item.betrag === "" ? "" : item.betrag) + '"></div>' +
       '<div class="field"><label>' + t("currency") + '</label><select id="sh_currency">' +
         '<option value="THB"' + (item.waehrung === "THB" ? " selected" : "") + '>THB</option>' +
@@ -601,18 +678,20 @@ select {
       };
     }
     document.getElementById("sh_save").onclick = function () {
-      var name = document.getElementById("sh_name").value.trim();
+      var nameDe = document.getElementById("sh_name_de").value.trim();
+      var nameTh = document.getElementById("sh_name_th").value.trim();
       var amount = parseFloat(String(document.getElementById("sh_amount").value).replace(",", "."));
       var currency = document.getElementById("sh_currency").value;
-      if (!name) { alert(t("nameRequired")); return; }
+      if (!nameDe && !nameTh) { alert(t("nameRequired")); return; }
       if (isNaN(amount)) { alert(t("invalidNumber")); return; }
+      // Wird nur eine Sprache ausgefuellt, uebernimmt die andere denselben Text (keine Luecke)
+      if (!nameDe) nameDe = nameTh;
+      if (!nameTh) nameTh = nameDe;
       if (editing) {
-        if (state.language === "th") item.nameTh = name; else item.nameDe = name;
+        item.nameDe = nameDe; item.nameTh = nameTh;
         item.betrag = amount; item.waehrung = currency;
       } else {
-        var newItem = { nameDe: name, nameTh: name, betrag: amount, waehrung: currency };
-        if (state.language === "th") { newItem.nameTh = name; newItem.nameDe = name; }
-        month.ausgaben.push(newItem);
+        month.ausgaben.push({ nameDe: nameDe, nameTh: nameTh, betrag: amount, waehrung: currency });
       }
       save(state); closeSheet(); renderExpenses(); renderOverview(); renderHistory();
     };

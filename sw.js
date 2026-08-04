@@ -1,7 +1,7 @@
 /* Budget Koh Samui - Service Worker
    Cache-first fuer die App-Huelle, damit die App offline startet.
    Bei jeder inhaltlichen Aenderung CACHE-Version hochzaehlen (v1 -> v2 ...). */
-const CACHE = "budget-samui-v1";
+const CACHE = "budget-samui-v3";
 const ASSETS = [
   "./",
   "./index.html",
