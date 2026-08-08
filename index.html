@@ -174,7 +174,22 @@ main { flex: 1; padding: 16px 16px calc(90px + var(--safe-bottom)); max-width: 6
 .expense-row:last-child { border-bottom: none; }
 .expense-name { font-size: 0.95rem; }
 .expense-currency { font-size: 0.72rem; color: var(--ink-muted); }
-.expense-amount { font-weight: 600; white-space: nowrap; }
+.expense-amount { font-weight: 600; white-space: nowrap; text-align: right; }
+.expense-eur { font-size: 0.75rem; color: var(--ink-muted); font-weight: 400; white-space: nowrap; }
+.sort-bar { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 4px; }
+.sort-label { font-size: 0.72rem; color: var(--ink-muted); margin-right: 2px; }
+.sort-chip {
+  flex: 0 0 auto; font-size: 0.76rem; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+  background: rgba(127,127,127,0.14); color: var(--ink-muted);
+  border: 1px solid var(--border); cursor: pointer; white-space: nowrap;
+}
+.sort-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.expense-sum {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 0 2px; margin-top: 4px; border-top: 2px solid var(--border); font-weight: 700;
+}
+/* Platz lassen, damit der +-Knopf die Summenzeile nicht verdeckt */
+#expenseList { padding-bottom: 140px; }
 .fab {
   position: fixed; right: 20px; bottom: calc(86px + var(--safe-bottom)); z-index: 15;
   width: 52px; height: 52px; border-radius: 50%; background: var(--accent); color: #2A2004;
@@ -280,6 +295,7 @@ select {
     <section class="tab" id="tab-expenses">
       <div class="card">
         <h2 id="lbl_expenses">AUSGABEN</h2>
+        <div class="sort-bar" id="sortBar"></div>
         <div id="expenseList"></div>
       </div>
       <button class="fab" id="btnAddExpense" aria-label="Hinzufügen">+</button>
@@ -373,7 +389,8 @@ select {
       exportData: "Exportieren", importData: "Importieren",
       importConfirm: "Aktuelle Daten durch die Sicherung ersetzen? Das kann nicht rückgängig gemacht werden.",
       importError: "Datei konnte nicht gelesen werden (ungültiges Format).",
-      importDone: "Sicherung erfolgreich importiert."
+      importDone: "Sicherung erfolgreich importiert.",
+      sortBy: "Sortieren:", sortOrig: "Eingabe", sortName: "Name", sortAmount: "Betrag", sumRow: "Summe"
     },
     th: {
       appTitle: "งบประมาณ เกาะสมุย", tabOverview: "ภาพรวม", tabExpenses: "รายจ่าย", tabHistory: "ประวัติ",
@@ -392,7 +409,8 @@ select {
       exportData: "ส่งออก", importData: "นำเข้า",
       importConfirm: "แทนที่ข้อมูลปัจจุบันด้วยไฟล์สำรองหรือไม่? ไม่สามารถย้อนกลับได้",
       importError: "อ่านไฟล์ไม่สำเร็จ (รูปแบบไม่ถูกต้อง)",
-      importDone: "นำเข้าข้อมูลสำรองสำเร็จ"
+      importDone: "นำเข้าข้อมูลสำรองสำเร็จ",
+      sortBy: "เรียงตาม:", sortOrig: "ตามที่กรอก", sortName: "ชื่อ", sortAmount: "จำนวนเงิน", sumRow: "รวม"
     }
   };
 
@@ -428,6 +446,68 @@ select {
     return intPart + "," + parts[1] + " €";
   }
   function expenseThb(item, rate) { return item.waehrung === "EUR" ? item.betrag * rate : item.betrag; }
+  function expenseEur(item, rate) { return item.waehrung === "EUR" ? item.betrag : (rate ? item.betrag / rate : 0); }
+
+  // Sortierung ist reine Anzeige - die gespeicherte Reihenfolge bleibt erhalten.
+  var sortKey = null;        // null = Eingabereihenfolge, sonst "name" | "amount"
+  var sortDesc = false;
+  try {
+    var sv = JSON.parse(localStorage.getItem("budgetKohSamuiSort") || "null");
+    if (sv && (sv.key === "name" || sv.key === "amount")) { sortKey = sv.key; sortDesc = !!sv.desc; }
+  } catch (e) {}
+  function saveSort() {
+    try { localStorage.setItem("budgetKohSamuiSort", JSON.stringify({ key: sortKey, desc: sortDesc })); } catch (e) {}
+  }
+
+  function sortedExpenses() {
+    // Paare [echterIndex, posten], damit Bearbeiten den richtigen Datensatz trifft
+    var month = currentMonth();
+    var pairs = month.ausgaben.map(function (it, i) { return [i, it]; });
+    if (!sortKey) return pairs;
+    var rate = month.wechselkurs;
+    pairs.sort(function (a, b) {
+      var r;
+      if (sortKey === "name") {
+        var an = itemName(a[1]).toLowerCase(), bn = itemName(b[1]).toLowerCase();
+        r = an < bn ? -1 : (an > bn ? 1 : 0);
+      } else r = expenseThb(a[1], rate) - expenseThb(b[1], rate);
+      return sortDesc ? -r : r;
+    });
+    return pairs;
+  }
+
+  function setSort(key) {
+    // dreistufig: erster Klick -> zweiter dreht um -> dritter zurueck zur Eingabe
+    if (sortKey !== key) { sortKey = key; sortDesc = (key === "amount"); }
+    else if (sortDesc === (key === "amount")) { sortDesc = !sortDesc; }
+    else { sortKey = null; sortDesc = false; }
+    saveSort();
+    renderSortBar();
+    renderExpenses();
+  }
+
+  function renderSortBar() {
+    var bar = document.getElementById("sortBar");
+    bar.innerHTML = "";
+    var lab = document.createElement("span");
+    lab.className = "sort-label";
+    lab.textContent = t("sortBy");
+    bar.appendChild(lab);
+    [["name", t("sortName")], ["amount", t("sortAmount")]].forEach(function (p) {
+      var b = document.createElement("button");
+      b.className = "sort-chip" + (sortKey === p[0] ? " active" : "");
+      b.textContent = p[1] + (sortKey === p[0] ? (sortDesc ? " ↓" : " ↑") : "");
+      b.onclick = function () { setSort(p[0]); };
+      bar.appendChild(b);
+    });
+    if (sortKey) {
+      var reset = document.createElement("button");
+      reset.className = "sort-chip";
+      reset.textContent = t("sortOrig");
+      reset.onclick = function () { sortKey = null; sortDesc = false; saveSort(); renderSortBar(); renderExpenses(); };
+      bar.appendChild(reset);
+    }
+  }
 
   function compute(month) {
     var rate = month.wechselkurs;
@@ -448,6 +528,7 @@ select {
     renderTexts();
     renderMonths();
     renderOverview();
+    renderSortBar();
     renderExpenses();
     renderHistory();
   }
@@ -528,17 +609,27 @@ select {
       list.appendChild(p);
       return;
     }
-    month.ausgaben.forEach(function (item, idx) {
+    var rate = month.wechselkurs;
+    sortedExpenses().forEach(function (pair) {
+      var idx = pair[0], item = pair[1];
       var row = document.createElement("div");
       row.className = "expense-row";
-      var thb = expenseThb(item, month.wechselkurs);
       row.innerHTML =
         '<div><div class="expense-name">' + escapeHtml(itemName(item)) + '</div>' +
         (item.waehrung === "EUR" ? '<div class="expense-currency">' + item.betrag.toFixed(2) + ' EUR</div>' : '') +
-        '</div><div class="expense-amount num">' + fmtThb(thb) + '</div>';
+        '</div><div class="expense-amount num">' + fmtThb(expenseThb(item, rate)) +
+        '<div class="expense-eur num">' + fmtEur(expenseEur(item, rate)) + '</div></div>';
       row.onclick = function () { openExpenseSheet(idx); };
       list.appendChild(row);
     });
+
+    var totalThb = month.ausgaben.reduce(function (s, i) { return s + expenseThb(i, rate); }, 0);
+    var totalEur = month.ausgaben.reduce(function (s, i) { return s + expenseEur(i, rate); }, 0);
+    var sum = document.createElement("div");
+    sum.className = "expense-sum";
+    sum.innerHTML = '<div>' + t("sumRow") + '</div><div class="expense-amount num">' + fmtThb(totalThb) +
+      '<div class="expense-eur num">' + fmtEur(totalEur) + '</div></div>';
+    list.appendChild(sum);
   }
 
   function renderHistory() {
